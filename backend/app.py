@@ -6,6 +6,7 @@ import random
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Embedding, SimpleRNN, Dense, Input
+from transformers import AutoTokenizer
 
 
 app = Flask(__name__)
@@ -13,7 +14,7 @@ app = Flask(__name__)
 # ======================
 # LOAD MODEL
 # ======================
-def build_model(num_words=10000, maxlen=100):
+def build_model(num_words=10000, maxlen=128):
 
     inputs = Input(shape=(maxlen,))
 
@@ -21,7 +22,7 @@ def build_model(num_words=10000, maxlen=100):
 
     x = SimpleRNN(64, return_sequences=True)(x)
 
-    x = SimpleRNN(128)(x)
+    x = SimpleRNN(32)(x)
 
     outputs = Dense(1, activation='sigmoid')(x)
 
@@ -36,13 +37,12 @@ def build_model(num_words=10000, maxlen=100):
     return model
 
 
-model = build_model(num_words=32005, maxlen=100)
+tokenizer = AutoTokenizer.from_pretrained("almanach/camembert-large")
+
+MAXLEN = 128
+
+model = build_model(num_words=tokenizer.vocab_size, maxlen=MAXLEN)
 model.load_weights("model_allocine.weights.h5")
-
-with open("word_index.pkl", "rb") as f:
-    word_index = pickle.load(f)
-
-maxlen = 100
 
 # ======================
 # PHRASES DYNAMIQUES
@@ -62,16 +62,16 @@ negative_phrases = [
 # ======================
 # PREPROCESS TEXT
 # ======================
-def preprocess(text):
-    text = text.lower()
-    tokens = text.split()
+def preprocess(texte):
+    token = tokenizer(
+        texte,
+        padding="max_length",
+        truncation=True,
+        max_length=MAXLEN,
+        return_tensors="np"
+    )
 
-    seq = []
-    for w in tokens:
-        if w in word_index:
-            seq.append(word_index[w])
-
-    return pad_sequences([seq], maxlen=maxlen)
+    return token["input_ids"] 
 
 # ======================
 # ROUTE PREDICTION
