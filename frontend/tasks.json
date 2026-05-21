@@ -1,0 +1,14 @@
+[
+  {
+    "task": "Faire à manger",
+    "done": false
+  },
+  {
+    "task": "Maintenance du site",
+    "done": false
+  },
+  {
+    "task": "Autre tâche",
+    "done": false
+  }
+]
