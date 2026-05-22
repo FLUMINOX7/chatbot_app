@@ -1,102 +1,38 @@
-import tensorflow as tf
 from flask import Flask, request, jsonify
-import numpy as np
-import pickle
 import random
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Embedding, SimpleRNN, Dense, Input
-
+import pandas as pd
+from transformers import pipeline
 
 app = Flask(__name__)
 
 # ======================
 # LOAD MODEL
 # ======================
-def build_model(num_words=10000, maxlen=100):
+def pandas_model(question):
 
-    inputs = Input(shape=(maxlen,))
+    df = {"Actors": ["Brad Pitt", "Leonardo Di Caprio", "George Clooney"], "Number of movies": ["87", "53", "69"]}
+    table = pd.DataFrame.from_dict(df)
 
-    x = Embedding(input_dim=num_words, output_dim=128)(inputs)
+    # pipeline model
+    # Note: you must to install torch-scatter first.
+    tqa = pipeline(task="table-question-answering", model="google/tapas-large-finetuned-wtq")
 
-    x = SimpleRNN(64, return_sequences=True)(x)
-
-    x = SimpleRNN(128)(x)
-
-    outputs = Dense(1, activation='sigmoid')(x)
-
-    model = Model(inputs=inputs, outputs=outputs)
-
-    model.compile(
-        loss='binary_crossentropy',
-        optimizer='adam',
-        metrics=['accuracy']
-    )
-
-    return model
+    # result
+    return (tqa(table=table, query=question)['cells'][0])
 
 
-model = build_model(num_words=32005, maxlen=100)
-model.load_weights("model_allocine.weights.h5")
+@app.route("/pandas_predict", methods=["POST"])
+def pandas_predict():
+    # Implementation for pandas prediction
+    question = request.json["text"]
 
-with open("word_index.pkl", "rb") as f:
-    word_index = pickle.load(f)
-
-maxlen = 100
-
-# ======================
-# PHRASES DYNAMIQUES
-# ======================
-positive_phrases = [
-    "Le modèle est confiant dans une opinion positive.",
-    "Cela ressemble fortement à un avis favorable.",
-    "Sentiment globalement enthousiaste détecté.",
-]
-
-negative_phrases = [
-    "Le texte exprime clairement une opinion négative.",
-    "Le modèle détecte une forte polarité négative.",
-    "Sentiment défavorable identifié avec confiance.",
-]
-
-# ======================
-# PREPROCESS TEXT
-# ======================
-def preprocess(text):
-    text = text.lower()
-    tokens = text.split()
-
-    seq = []
-    for w in tokens:
-        if w in word_index:
-            seq.append(word_index[w])
-
-    return pad_sequences([seq], maxlen=maxlen)
-
-# ======================
-# ROUTE PREDICTION
-# ======================
-@app.route("/predict", methods=["POST"])
-def predict():
-    data = request.json["text"]
-
-    seq = preprocess(data)
-    pred = model.predict(seq)[0][0]
-
-    if pred >= 0.5:
-        label = "Positif"
-        phrase = random.choice(positive_phrases)
-    else:
-        label = "Négatif"
-        phrase = random.choice(negative_phrases)
-
-    # jsonify() transforme un dictionnaire Python en JSON valide HTTP
     return jsonify({
-        "text": data,
-        "prediction": float(pred),
-        "label": label,
-        "message": phrase
+        "text": question,
+        "prediction": None,
+        "label": "Example label",
+        "message": pandas_model(question)
     })
+
 
 if __name__ == "__main__":
     # =========================================================
